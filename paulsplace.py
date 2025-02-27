@@ -75,16 +75,16 @@ def main():
         shelters_df = pd.concat([shelters_df, sample_shelter_df], ignore_index=True)
 
         # Print the first few rows of the dataset
-        st.write("Raw Shelter Data:")
-        st.dataframe(shelters_df.head())
+        #st.write("Raw Shelter Data:")
+        #st.dataframe(shelters_df.head())
 
         # Convert to GeoDataFrame
         geometry = [Point(xy) for xy in zip(shelters_df['longitude'], shelters_df['latitude'])]
         shelters_gdf = gpd.GeoDataFrame(shelters_df, geometry=geometry, crs="EPSG:4326")
 
         # Print the filtered GeoDataFrame
-        st.write("Filtered Shelter Data (Valid Coordinates):")
-        st.dataframe(shelters_gdf.head())
+        #st.write("Filtered Shelter Data (Valid Coordinates):")
+        #st.dataframe(shelters_gdf.head())
 
         # Filter within 10 miles
         def calculate_distance(row):
