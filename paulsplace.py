@@ -17,7 +17,7 @@ from pyproj import Transformer
 st.title("Homeless Shelter Locator Near Paul's Place")
 
 # Hardcoded coordinates for Paul's Place
-pauls_place_lat, pauls_place_lon = 39.2752, -76.6329
+pauls_place_lat, pauls_place_lon = 39.2820504, -76.6328439
 
 # API Endpoint
 api_url = "https://services1.arcgis.com/UWYHeuuJISiGmgXx/arcgis/rest/services/Homeless_Shelter/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json"
@@ -65,8 +65,8 @@ def main():
         sample_shelter = {
             'name': 'Sample Shelter',
             'address': 'Near Paul\'s Place',
-            'latitude': 39.2752,  # Latitude
-            'longitude': -76.6329  # Longitude
+            'latitude': 39.2820501,  # Slightly north of Paul's Place
+            'longitude': -76.6328551  # Slightly west of Paul's Place
         }
         # Convert the sample shelter to a DataFrame
         sample_shelter_df = pd.DataFrame([sample_shelter])
@@ -76,6 +76,10 @@ def main():
         # Print the first few rows of the dataset
         st.write("Raw Shelter Data:")
         st.dataframe(shelters_df.head())
+
+        # Print converted coordinates
+        st.write("Converted Coordinates:")
+        st.write(shelters_df[['latitude', 'longitude']].head())
 
         # Convert to GeoDataFrame
         geometry = [Point(xy) for xy in zip(shelters_df['longitude'], shelters_df['latitude'])]
@@ -99,10 +103,15 @@ def main():
 
         # Print the filtered shelters within 10 miles
         st.write(f"Shelters Within {distance_threshold} Miles of Paul's Place:")
-        st.dataframe(shelters_gdf_filtered[['name', 'address', 'distance_to_pauls_place']])
+        st.dataframe(shelters_gdf_filtered[['name', 'latitude', 'longitude', 'distance_to_pauls_place']])
 
-        # Folium Map
-        m = folium.Map(location=[pauls_place_lat, pauls_place_lon], zoom_start=14)
+        # Folium Map with Stadia Maps tiles
+        m = folium.Map(
+            location=[pauls_place_lat, pauls_place_lon],
+            zoom_start=14,
+            tiles="https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png",
+            attr='Stadia Maps'
+        )
 
         # Add Paul's Place as a purple marker
         folium.Marker(
