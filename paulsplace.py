@@ -74,29 +74,27 @@ def main():
         # Append using pd.concat
         shelters_df = pd.concat([shelters_df, sample_shelter_df], ignore_index=True)
 
-        # Print the first few rows of the dataset
-        #st.write("Raw Shelter Data:")
-        #st.dataframe(shelters_df.head())
-
         # Convert to GeoDataFrame
         geometry = [Point(xy) for xy in zip(shelters_df['longitude'], shelters_df['latitude'])]
         shelters_gdf = gpd.GeoDataFrame(shelters_df, geometry=geometry, crs="EPSG:4326")
-
-        # Print the filtered GeoDataFrame
-        #st.write("Filtered Shelter Data (Valid Coordinates):")
-        #st.dataframe(shelters_gdf.head())
 
         # Filter within 10 miles
         def calculate_distance(row):
             return geodesic((pauls_place_lat, pauls_place_lon), (row['latitude'], row['longitude'])).miles
 
+        # Calculate distances
         shelters_gdf['distance_to_pauls_place'] = shelters_gdf.apply(calculate_distance, axis=1)
+
+        # Format distances as strings with "miles" appended
+        shelters_gdf['distance_to_pauls_place'] = shelters_gdf['distance_to_pauls_place'].apply(lambda x: f"{x:.2f} miles")
+
+        # Display distances to Paul's Place
         st.write("Distances to Paul's Place:")
         st.write(shelters_gdf[['name', 'distance_to_pauls_place']].head())
 
         # Filter shelters within 10 miles
         distance_threshold = 10  # 10 miles
-        shelters_gdf_filtered = shelters_gdf[shelters_gdf['distance_to_pauls_place'] <= distance_threshold]
+        shelters_gdf_filtered = shelters_gdf[shelters_gdf['distance_to_pauls_place'].str.replace(' miles', '').astype(float) <= distance_threshold]
 
         # Print the filtered shelters within 10 miles
         st.write(f"Shelters Within {distance_threshold} Miles of Paul's Place:")
