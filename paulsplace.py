@@ -3,7 +3,6 @@
 
 # In[ ]:
 
-       
 import streamlit as st
 import requests
 import pandas as pd
@@ -25,6 +24,18 @@ api_url = "https://services1.arcgis.com/UWYHeuuJISiGmgXx/arcgis/rest/services/Ho
 
 # Coordinate Transformer (State Plane Maryland to WGS84)
 transformer = Transformer.from_crs("EPSG:2248", "EPSG:4326", always_xy=True)
+
+# Load CSV file with additional locations
+@st.cache_data
+def load_csv_data():
+    try:
+        csv_df = pd.read_csv("baltimore_help_social_health_welfare_shelters_locations.csv")  
+        # Filter out Paul's Place from the CSV 
+        csv_df = csv_df[csv_df["Location"] != "Paul's Place"]
+        return csv_df
+    except Exception as e:
+        st.error(f"Error loading CSV file: {e}")
+        return pd.DataFrame()
 
 # Fetch Data from API
 @st.cache_data
@@ -55,28 +66,116 @@ def main():
     # Fetch shelter data
     shelters_df = fetch_shelter_data()
 
-    if not shelters_df.empty:
-        # Convert projected coordinates to latitude/longitude
-        shelters_df[['latitude', 'longitude']] = shelters_df.apply(convert_coordinates, axis=1)
+    # Load CSV data
+    csv_df = load_csv_data()
 
-        # Drop rows with invalid coordinates
-        shelters_df = shelters_df.dropna(subset=['latitude', 'longitude'])
+    if not shelters_df.empty or not csv_df.empty:
+        # Convert projected coordinates to latitude/longitude for API data
+        if not shelters_df.empty:
+            shelters_df[['latitude', 'longitude']] = shelters_df.apply(convert_coordinates, axis=1)
+            shelters_df = shelters_df.dropna(subset=['latitude', 'longitude'])
 
-        # Add a sample shelter near Paul's Place
-        sample_shelter = {
-            'name': 'Sample Shelter',
-            'address': 'Near Paul\'s Place',
-            'latitude': 39.2752,  # Latitude
-            'longitude': -76.6329  # Longitude
+        # Merge CSV data with API data
+        if not csv_df.empty:
+            # Rename columns in CSV data to match API data
+            csv_df = csv_df.rename(columns={"Location": "name", "Latitude": "latitude", "Longitude": "longitude"})
+            # Ensure the 'address' column exists
+            if 'address' not in csv_df.columns:
+                csv_df['address'] = "Not Available"
+            csv_df['function'] = "Unknown"  # Default function for CSV data
+
+            # Combine API and CSV data
+            combined_df = pd.concat([shelters_df, csv_df], ignore_index=True)
+        else:
+            combined_df = shelters_df
+
+        # Define a mapping of location names to their functions
+        function_mapping = {
+            "VOA Pratt House": "Emergency Shelters",
+            "University of Maryland Medical Center": "Medical Services",
+            "The Baltimore Station": "Emergency Shelters",
+            "Christ Lutheran Place": "Emergency Shelters",
+            "Grace Medical Center": "Medical Services",
+            "American Rescue Workers": "Emergency Shelters",
+            "ACC My Sister’s Place Lodge": "Emergency Shelters",
+            "Seton Station": "Emergency Shelters",
+            "Our Daily Bread": "Food & Meals",
+            "Mercy Medical Center": "Medical Services",
+            "Patrick Allison House": "Emergency Shelters",
+            "Maryland Legal Aid": "Legal Services",
+            "Interfaith ES": "Emergency Shelters",
+            "Health Care for the Homeless": "Medical Services",
+            "Weinberg Housing and Resource Center": "Emergency Shelters",
+            "Maryland Center for Veterans Education and Training": "Veteran Services",
+            "YWCA - Druid House": "Emergency Shelters",
+            "ACC Christopher Place": "Emergency Shelters",
+            "Chase Brexton Health Services": "Medical Services",
+            "Code Blue J, H & R": "Emergency Shelters",
+            "Helping Up Mission": "Emergency Shelters",
+            "Salvation Army": "Emergency Shelters",
+            "Karis House": "Emergency Shelters",
+            "Baltimore Rescue Mission": "Emergency Shelters",
+            "Aunt CC's Harbor House": "Emergency Shelters",
+            "Earl’s Place": "Emergency Shelters",
+            "Umar Boxing": "Community Services",
+            "Pennsylvania Avenue Library": "Community Services",
+            "Orleans Street Library": "Community Services",
+            "SVdP Ozanam House": "Emergency Shelters",
+            "Project PLASE": "Emergency Shelters",
+            "East Baltimore Medical Center": "Medical Services",
+            "Cherry Hill Library": "Community Services",
+            "MedStar Harbor Hospital": "Medical Services",
+            "Baltimore Safe Haven": "Emergency Shelters",
+            "Johns Hopkins Hospital": "Medical Services",
+            "MCVET ES" :  "Veteran Services",
+            "Helping Up": "Emergency Shelters",
+            "Salvation Army/Booth House": "Emergency Shelters",
+            "Project PLASE - Maryland Ave.": "Emergency Shelters",
+            "Project PLASE ES":  "Emergency Shelters",
+            "Prisoners AID ES": "Legal Services",
+            "Franciscan Center": "Food & Meals",
+            "Kennedy Krieger Institute": "Medical Services",
+            "Youth Empowered Society (YES)": "Youth Services",
+            "ACC Project FRESH Start": "Emergency Shelters",
+            "St. Vincent de Paul of Baltimore": "Emergency Shelters",
+            "Northwest One-Stop Career Center": "Employment Services",
+            "Church of the Guardian Angel": "Community Services",
+            "At Jacob’s Well": "Emergency Shelters",
+            "Prisoner’s Aid": "Legal Services",
+            "Manna House": "Emergency Shelters",
+            "Supportive Housing Group/Lanvale Institute": "Housing Services",
+            "Collington Square": "Community Services",
+            "Dayspring Village": "Housing Services",
+            "J, H & R - VA": "Veteran Services",
+            "J, H & R - Carrington House": "Veteran Services",
+            "Sacred House": "Community Services",
+            "Eastside One-Stop Career Center": "Employment Services",
+            "Brooklyn Library": "Community Services",
+            "Marian House": "Housing Services",
+            "MedStar Union Memorial Hospital": "Medical Services",
+            "SVdP Cottage Avenue": "Emergency Shelters",
+            "Southeast Anchor Library": "Community Services",
+            "Grace Baptist Church": "Community Services",
+            "BMHS Ethel Elan Safe Haven II": "Emergency Shelters",
+            "BMHS Safe Haven I": "Emergency Shelters",
+            "Johns Hopkins Bayview Medical Center": "Medical Services",
+            "Maryland Food Bank": "Food & Meals",
+            "Park West Health System | Belvedere Ave.": "Medical Services",
+            "Sinai Hospital": "Medical Services",
+            "Levindale Hebrew Geriatric Center and Hospital": "Medical Services",
+            "Mt. Washington Pediatric Hospital": "Medical Services",
+            "MedStar Good Samaritan Hospital": "Medical Services",
+            "Harbel Community Organization": "Community Services",
+            "House of Ruth": "Emergency Shelters",  
+            "House of Ruth ES": "Emergency Shelters", 
         }
-        # Convert the sample shelter to a DataFrame
-        sample_shelter_df = pd.DataFrame([sample_shelter])
-        # Append using pd.concat
-        shelters_df = pd.concat([shelters_df, sample_shelter_df], ignore_index=True)
+
+        # Update function column in the combined DataFrame
+        combined_df['function'] = combined_df['name'].map(function_mapping).fillna("Unknown")
 
         # Convert to GeoDataFrame
-        geometry = [Point(xy) for xy in zip(shelters_df['longitude'], shelters_df['latitude'])]
-        shelters_gdf = gpd.GeoDataFrame(shelters_df, geometry=geometry, crs="EPSG:4326")
+        geometry = [Point(xy) for xy in zip(combined_df['longitude'], combined_df['latitude'])]
+        shelters_gdf = gpd.GeoDataFrame(combined_df, geometry=geometry, crs="EPSG:4326")
 
         # Filter within 10 miles
         def calculate_distance(row):
@@ -88,17 +187,20 @@ def main():
         # Format distances as strings with "miles" appended
         shelters_gdf['distance_to_pauls_place'] = shelters_gdf['distance_to_pauls_place'].apply(lambda x: f"{x:.2f} miles")
 
-        # Display distances to Paul's Place
+        # Sort by distance in ascending order
+        shelters_gdf_sorted = shelters_gdf.sort_values(by='distance_to_pauls_place', key=lambda x: x.str.replace(' miles', '').astype(float))
+
+        # Display distances to Paul's Place in ascending order
         st.write("Distances to Paul's Place:")
-        st.write(shelters_gdf[['name', 'distance_to_pauls_place']].head())
+        st.write(shelters_gdf_sorted[['name', 'function', 'distance_to_pauls_place']])
 
         # Filter shelters within 10 miles
         distance_threshold = 10  # 10 miles
-        shelters_gdf_filtered = shelters_gdf[shelters_gdf['distance_to_pauls_place'].str.replace(' miles', '').astype(float) <= distance_threshold]
+        shelters_gdf_filtered = shelters_gdf_sorted[shelters_gdf_sorted['distance_to_pauls_place'].str.replace(' miles', '').astype(float) <= distance_threshold]
 
         # Print the filtered shelters within 10 miles
         st.write(f"Shelters Within {distance_threshold} Miles of Paul's Place:")
-        st.dataframe(shelters_gdf_filtered[['name', 'address', 'distance_to_pauls_place']])
+        st.dataframe(shelters_gdf_filtered[['name', 'function', 'address', 'distance_to_pauls_place']])
 
         # Folium Map
         m = folium.Map(location=[pauls_place_lat, pauls_place_lon], zoom_start=14)
@@ -112,12 +214,9 @@ def main():
 
         # Add shelters within 10 miles as green markers
         for idx, row in shelters_gdf_filtered.iterrows():
-            # Skip Paul's Place if it appears in the shelters data
-            if row['latitude'] == pauls_place_lat and row['longitude'] == pauls_place_lon:
-                continue
             folium.Marker(
                 location=[row['latitude'], row['longitude']],
-                popup=row['name'],
+                popup=f"{row['name']} ({row['function']})",
                 icon=folium.Icon(color="green")
             ).add_to(m)
 
